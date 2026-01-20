@@ -1,7 +1,4 @@
-"""STM MCP Server - Montreal Transit API."""
-
 from datetime import UTC, datetime
-
 from mcp.server.fastmcp import FastMCP
 from pydantic import BaseModel
 
@@ -36,7 +33,6 @@ def health() -> HealthResponse:
 
 
 def main() -> None:
-    """Run the STM MCP server."""
     mcp.run()
 
 
