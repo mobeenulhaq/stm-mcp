@@ -92,9 +92,12 @@ def main() -> None:
 
         asyncio.run(run_ingest(args.gtfs_path, args.db))
     else:
-        # Default: run MCP server
+        # default
         mcp.run()
 
+
+# Import tool modules to register them with the MCP server
+from stm_mcp.tools import schedule_tools, stop_tools  # noqa: F401, E402
 
 if __name__ == "__main__":
     main()

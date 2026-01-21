@@ -124,7 +124,9 @@ class TestGTFSLoader:
         assert db_path.exists()
         assert not temp_path.exists()
 
-    async def test_atomic_swap_replaces_existing(self, sample_gtfs_dir: Path, tmp_path: Path) -> None:
+    async def test_atomic_swap_replaces_existing(
+        self, sample_gtfs_dir: Path, tmp_path: Path
+    ) -> None:
         """Test that ingestion replaces an existing database."""
         db_path = tmp_path / "test.db"
 
