@@ -3,7 +3,7 @@ name = "stm-mcp"
 version = "0.1.0"
 description = "MCP server for STM (Montreal Transit) API"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.14"
 license = { text = "MIT" }
 authors = [{ name = "Mobeen Ul Haq" }]
 dependencies = [

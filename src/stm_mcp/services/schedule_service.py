@@ -197,7 +197,7 @@ async def get_scheduled_arrivals(
     start_time: str | None = None,
     end_time: str | None = None,
     limit: int = 20,
-    db_path: Path | None = None,s
+    db_path: Path | None = None,
 ) -> GetScheduledArrivalsResponse:
     """Get scheduled arrivals at a stop.
 
