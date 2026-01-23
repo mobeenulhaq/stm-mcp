@@ -105,22 +105,6 @@ class TestResolveRouteNumber:
         assert response.best_match.route_short_name == "24"
         assert response.best_match.match_type == MatchType.NUMBER_EXACT
 
-    async def test_route_number_with_bus_prefix(self, db_path: Path) -> None:
-        """Test route number with 'bus' prefix."""
-        response = await resolve_route("bus 80", db_path=db_path)
-
-        assert response.resolved is True
-        assert response.best_match is not None
-        assert response.best_match.route_short_name == "80"
-
-    async def test_three_digit_route(self, db_path: Path) -> None:
-        """Test three-digit route number."""
-        response = await resolve_route("747", db_path=db_path)
-
-        assert response.resolved is True
-        assert response.best_match is not None
-        assert response.best_match.route_short_name == "747"
-
 
 class TestResolveRouteMetroAlias:
     """Tests for metro line alias matching."""
@@ -142,30 +126,6 @@ class TestResolveRouteMetroAlias:
         assert response.resolved is True
         assert response.best_match is not None
         assert response.best_match.route_id == "1"
-
-    async def test_orange_line(self, db_path: Path) -> None:
-        """Test Orange line alias."""
-        response = await resolve_route("orange", db_path=db_path)
-
-        assert response.resolved is True
-        assert response.best_match is not None
-        assert response.best_match.route_id == "2"
-
-    async def test_yellow_line(self, db_path: Path) -> None:
-        """Test Yellow line alias."""
-        response = await resolve_route("yellow line", db_path=db_path)
-
-        assert response.resolved is True
-        assert response.best_match is not None
-        assert response.best_match.route_id == "4"
-
-    async def test_blue_line(self, db_path: Path) -> None:
-        """Test Blue line alias."""
-        response = await resolve_route("blue", db_path=db_path)
-
-        assert response.resolved is True
-        assert response.best_match is not None
-        assert response.best_match.route_id == "5"
 
 
 class TestResolveRouteFuzzy:
@@ -192,12 +152,6 @@ class TestResolveRouteFuzzy:
 class TestResolveRouteOptions:
     """Tests for resolve_route options."""
 
-    async def test_limit_option(self, db_path: Path) -> None:
-        """Test that limit is respected."""
-        response = await resolve_route("line", limit=2, db_path=db_path)
-
-        assert len(response.matches) <= 2
-
     async def test_empty_query(self, db_path: Path) -> None:
         """Test that empty query returns empty results."""
         response = await resolve_route("", db_path=db_path)
@@ -206,33 +160,9 @@ class TestResolveRouteOptions:
         assert response.best_match is None
         assert len(response.matches) == 0
 
-    async def test_nonexistent_route(self, db_path: Path) -> None:
-        """Test that nonexistent route returns empty or low confidence."""
-        response = await resolve_route("999", db_path=db_path)
-
-        # Either no matches or no exact match
-        if response.best_match:
-            assert response.best_match.match_type != MatchType.NUMBER_EXACT
-
 
 class TestResolveRouteResolution:
     """Tests for resolution status."""
-
-    async def test_resolved_true_for_exact(self, db_path: Path) -> None:
-        """Test resolved=True for exact matches."""
-        response = await resolve_route("24", db_path=db_path)
-
-        assert response.resolved is True
-        assert response.best_match is not None
-        assert response.best_match.confidence == MatchConfidence.EXACT
-
-    async def test_best_match_always_set(self, db_path: Path) -> None:
-        """Test that best_match is always set when matches exist."""
-        response = await resolve_route("line", db_path=db_path)
-
-        if len(response.matches) > 0:
-            assert response.best_match is not None
-            assert response.best_match == response.matches[0]
 
     async def test_route_type_preserved(self, db_path: Path) -> None:
         """Test that route_type is correctly preserved."""

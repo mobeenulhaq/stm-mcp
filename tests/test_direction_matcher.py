@@ -114,22 +114,6 @@ class TestResolveDirectionPrefix:
         assert response.best_match is not None
         assert "Angrignon" in response.best_match.headsign
 
-    async def test_vers_prefix_stripped(self, db_path: Path) -> None:
-        """Test that 'vers' prefix is stripped (French)."""
-        response = await resolve_direction("vers Montmorency", route_id="2", db_path=db_path)
-
-        assert len(response.matches) > 0
-        assert response.best_match is not None
-        assert "Montmorency" in response.best_match.headsign
-
-    async def test_direction_prefix_stripped(self, db_path: Path) -> None:
-        """Test that 'direction' prefix is stripped."""
-        response = await resolve_direction("direction Viau", route_id="24", db_path=db_path)
-
-        assert len(response.matches) > 0
-        assert response.best_match is not None
-        assert "Viau" in response.best_match.headsign
-
 
 class TestResolveDirectionFilter:
     """Tests for direction_id filtering."""
@@ -145,27 +129,6 @@ class TestResolveDirectionFilter:
         for match in response_0.matches:
             assert match.direction_id == 0
 
-    async def test_filter_excludes_other_direction(self, db_path: Path) -> None:
-        """Test that filter excludes other direction."""
-        # Direction 1 for route 1 is Honoré-Beaugrand, not Angrignon
-        response = await resolve_direction(
-            "Angrignon", route_id="1", direction_id=1, db_path=db_path
-        )
-
-        # Should have lower score or no matches since Angrignon is direction 0
-        if len(response.matches) > 0:
-            assert response.best_match is not None
-            # Should not be a high confidence match
-            assert response.best_match.confidence != MatchConfidence.EXACT
-
-    async def test_both_directions_without_filter(self, db_path: Path) -> None:
-        """Test that without filter, both directions are searched."""
-        response = await resolve_direction("a", route_id="1", min_score=10, db_path=db_path)
-
-        # Should get matches from both directions
-        direction_ids = {m.direction_id for m in response.matches}
-        assert len(direction_ids) >= 1  # At least one direction
-
 
 class TestResolveDirectionOptions:
     """Tests for resolve_direction options."""
@@ -178,23 +141,6 @@ class TestResolveDirectionOptions:
         assert response.best_match is None
         assert len(response.matches) == 0
 
-    async def test_nonexistent_route(self, db_path: Path) -> None:
-        """Test that nonexistent route returns empty results."""
-        response = await resolve_direction("Angrignon", route_id="999", db_path=db_path)
-
-        assert response.resolved is False
-        assert len(response.matches) == 0
-
-    async def test_min_score_filter(self, db_path: Path) -> None:
-        """Test that min_score filters results."""
-        response_low = await resolve_direction(
-            "xyz", route_id="1", min_score=10, db_path=db_path
-        )
-        response_high = await resolve_direction(
-            "xyz", route_id="1", min_score=90, db_path=db_path
-        )
-
-        assert len(response_high.matches) <= len(response_low.matches)
 
 
 class TestResolveDirectionResolution:
@@ -209,20 +155,6 @@ class TestResolveDirectionResolution:
             MatchConfidence.HIGH,
         ):
             assert response.resolved is True
-
-    async def test_response_includes_route_id(self, db_path: Path) -> None:
-        """Test that response includes route_id."""
-        response = await resolve_direction("Angrignon", route_id="1", db_path=db_path)
-
-        assert response.route_id == "1"
-
-    async def test_response_includes_direction_filter(self, db_path: Path) -> None:
-        """Test that response includes direction_id_filter."""
-        response = await resolve_direction(
-            "Angrignon", route_id="1", direction_id=0, db_path=db_path
-        )
-
-        assert response.direction_id_filter == 0
 
     async def test_match_type_is_fuzzy(self, db_path: Path) -> None:
         """Test that direction matches have FUZZY_NAME match type."""

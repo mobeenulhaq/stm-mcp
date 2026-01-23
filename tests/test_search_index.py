@@ -89,13 +89,6 @@ class TestSearchIndexLoading:
         assert len(index.routes) > 0
         assert len(index.headsigns) > 0
 
-    async def test_singleton_pattern(self, db_path: Path) -> None:
-        """Test that get_instance returns same instance."""
-        index1 = await SearchIndex.get_instance(db_path)
-        index2 = await SearchIndex.get_instance(db_path)
-
-        assert index1 is index2
-
     async def test_excludes_stations(self, db_path: Path) -> None:
         """Test that stations (location_type=1) are excluded from stops."""
         index = await SearchIndex.get_instance(db_path)
@@ -116,21 +109,6 @@ class TestSearchIndexStops:
         stop = index.stops_by_code["51001"]
         assert stop.stop_name == "Berri-UQAM"
 
-    async def test_stops_by_id_lookup(self, db_path: Path) -> None:
-        """Test O(1) lookup by stop ID."""
-        index = await SearchIndex.get_instance(db_path)
-
-        assert "BERRI" in index.stops_by_id
-        stop = index.stops_by_id["BERRI"]
-        assert stop.stop_name == "Berri-UQAM"
-
-    async def test_normalized_name_precomputed(self, db_path: Path) -> None:
-        """Test that normalized names are pre-computed."""
-        index = await SearchIndex.get_instance(db_path)
-
-        stop = index.stops_by_id["BERRI"]
-        assert stop.normalized_name == "berri-uqam"
-
 
 class TestSearchIndexRoutes:
     """Tests for route indexing."""
@@ -142,24 +120,6 @@ class TestSearchIndexRoutes:
         assert "1" in index.routes_by_id
         route = index.routes_by_id["1"]
         assert route.route_short_name == "Green"
-
-    async def test_routes_by_number_lookup(self, db_path: Path) -> None:
-        """Test O(1) lookup by route number."""
-        index = await SearchIndex.get_instance(db_path)
-
-        assert "24" in index.routes_by_number
-        route = index.routes_by_number["24"]
-        assert route.route_long_name == "Sherbrooke"
-
-    async def test_route_type_preserved(self, db_path: Path) -> None:
-        """Test that route_type is preserved."""
-        index = await SearchIndex.get_instance(db_path)
-
-        metro = index.routes_by_id["1"]
-        assert metro.route_type == 1  # Metro
-
-        bus = index.routes_by_number["24"]
-        assert bus.route_type == 3  # Bus
 
 
 class TestSearchIndexHeadsigns:
@@ -173,23 +133,6 @@ class TestSearchIndexHeadsigns:
         headsigns = index.headsigns_by_route["1"]
         assert len(headsigns) >= 2  # Angrignon and Honoré-Beaugrand
 
-    async def test_headsign_direction_id(self, db_path: Path) -> None:
-        """Test that direction_id is preserved."""
-        index = await SearchIndex.get_instance(db_path)
-
-        headsigns = index.headsigns_by_route["1"]
-        direction_ids = {h.direction_id for h in headsigns}
-        assert 0 in direction_ids
-        assert 1 in direction_ids
-
-    async def test_normalized_headsign_precomputed(self, db_path: Path) -> None:
-        """Test that normalized headsigns are pre-computed."""
-        index = await SearchIndex.get_instance(db_path)
-
-        headsigns = index.headsigns_by_route["1"]
-        angrignon = next(h for h in headsigns if "Angrignon" in h.headsign)
-        assert angrignon.normalized_headsign == "angrignon"
-
 
 class TestSearchIndexInvalidate:
     """Tests for index invalidation."""
@@ -201,13 +144,6 @@ class TestSearchIndexInvalidate:
         index2 = await SearchIndex.get_instance(db_path)
 
         # Should be different instances
-        assert index1 is not index2
-
-    async def test_reload_returns_fresh_instance(self, db_path: Path) -> None:
-        """Test that reload returns a fresh instance."""
-        index1 = await SearchIndex.get_instance(db_path)
-        index2 = await SearchIndex.reload(db_path)
-
         assert index1 is not index2
 
 

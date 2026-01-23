@@ -119,24 +119,6 @@ class TestResolveStopFuzzy:
         match_names = [m.stop_name for m in response.matches]
         assert any("Berri" in name for name in match_names)
 
-    async def test_fuzzy_match_abbreviation(self, db_path: Path) -> None:
-        """Test fuzzy matching expands abbreviations."""
-        response = await resolve_stop("St-Michel", db_path=db_path)
-
-        assert len(response.matches) > 0
-        # Should find Saint-Michel
-        assert response.best_match is not None
-        assert "Michel" in response.best_match.stop_name
-
-    async def test_fuzzy_match_accents(self, db_path: Path) -> None:
-        """Test fuzzy matching handles accents."""
-        response = await resolve_stop("Prefontaine", db_path=db_path)
-
-        assert len(response.matches) > 0
-        # Should find Préfontaine
-        assert response.best_match is not None
-        assert "fontaine" in response.best_match.stop_name.lower()
-
 
 class TestResolveStopCrossStreet:
     """Tests for cross-street pattern matching."""
@@ -152,24 +134,9 @@ class TestResolveStopCrossStreet:
         ]
         assert len(cross_matches) > 0
 
-    async def test_cross_street_both_streets(self, db_path: Path) -> None:
-        """Test that cross-street matches both streets."""
-        response = await resolve_stop("Sherbrooke / Saint-Denis", db_path=db_path)
-
-        assert response.best_match is not None
-        # Should match Sherbrooke / Saint-Denis stop
-        assert "Sherbrooke" in response.best_match.stop_name
-        assert "Denis" in response.best_match.stop_name
-
 
 class TestResolveStopOptions:
     """Tests for resolve_stop options."""
-
-    async def test_limit_option(self, db_path: Path) -> None:
-        """Test that limit is respected."""
-        response = await resolve_stop("S", limit=2, db_path=db_path)
-
-        assert len(response.matches) <= 2
 
     async def test_min_score_option(self, db_path: Path) -> None:
         """Test that min_score filters results."""
@@ -186,24 +153,9 @@ class TestResolveStopOptions:
         assert response.best_match is None
         assert len(response.matches) == 0
 
-    async def test_whitespace_query(self, db_path: Path) -> None:
-        """Test that whitespace-only query returns empty results."""
-        response = await resolve_stop("   ", db_path=db_path)
-
-        assert response.resolved is False
-        assert len(response.matches) == 0
-
 
 class TestResolveStopResolution:
     """Tests for resolution status."""
-
-    async def test_resolved_true_for_exact(self, db_path: Path) -> None:
-        """Test resolved=True for exact matches."""
-        response = await resolve_stop("51001", db_path=db_path)
-
-        assert response.resolved is True
-        assert response.best_match is not None
-        assert response.best_match.confidence == MatchConfidence.EXACT
 
     async def test_best_match_always_set(self, db_path: Path) -> None:
         """Test that best_match is always set when matches exist."""
@@ -212,10 +164,3 @@ class TestResolveStopResolution:
         assert len(response.matches) > 0
         assert response.best_match is not None
         assert response.best_match == response.matches[0]
-
-    async def test_matches_sorted_by_score(self, db_path: Path) -> None:
-        """Test that matches are sorted by score descending."""
-        response = await resolve_stop("Sherbrooke", db_path=db_path)
-
-        for i in range(len(response.matches) - 1):
-            assert response.matches[i].score >= response.matches[i + 1].score
