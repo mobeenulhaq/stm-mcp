@@ -1,5 +1,3 @@
-"""MCP tools for querying schedules."""
-
 from stm_mcp.models.responses import GetScheduledArrivalsResponse
 from stm_mcp.server import mcp
 from stm_mcp.services.schedule_service import (

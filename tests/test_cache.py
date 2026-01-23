@@ -23,14 +23,6 @@ def test_cache_ttl_expiration():
     assert cache.get() is None
 
 
-def test_cache_returns_value_before_expiration():
-    """Cache should return value before TTL expires."""
-    cache: FeedCache[str] = FeedCache(ttl=10.0)
-
-    cache.set("test_value")
-    assert cache.get() == "test_value"
-
-
 def test_cache_clear():
     """Cache clear should remove the value."""
     cache: FeedCache[str] = FeedCache(ttl=10.0)

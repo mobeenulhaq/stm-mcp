@@ -97,7 +97,7 @@ def main() -> None:
 
 
 # Import tool modules to register them with the MCP server
-from stm_mcp.tools import schedule_tools, stop_tools  # noqa: F401, E402
+from stm_mcp.tools import arrivals_tools, schedule_tools, stop_tools  # noqa: F401, E402
 
 if __name__ == "__main__":
     main()

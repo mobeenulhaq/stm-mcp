@@ -1,5 +1,3 @@
-"""MCP tools for searching stops."""
-
 from stm_mcp.models.responses import SearchStopsResponse
 from stm_mcp.server import mcp
 from stm_mcp.services.stop_service import search_stops as _search_stops

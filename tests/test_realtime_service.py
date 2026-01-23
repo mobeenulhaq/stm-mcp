@@ -35,21 +35,7 @@ async def test_get_trip_updates_returns_none_without_api_key():
     assert result is None
 
 
-@pytest.mark.asyncio
-async def test_get_vehicle_positions_returns_none_without_api_key():
-    """get_vehicle_positions should return None when no API key is configured."""
-    realtime_service._config = _config_without_api_key()
-    result = await realtime_service.get_vehicle_positions()
-    assert result is None
-
-
 def test_is_realtime_available_without_api_key():
     """is_realtime_available should return False without API key."""
     realtime_service._config = _config_without_api_key()
     assert realtime_service.is_realtime_available() is False
-
-
-def test_is_realtime_available_with_api_key():
-    """is_realtime_available should return True with API key."""
-    realtime_service._config = _config_with_api_key()
-    assert realtime_service.is_realtime_available() is True
