@@ -274,6 +274,11 @@ class GTFSLoader:
                 self.db_path.unlink()
             temp_db.rename(self.db_path)
 
+            # Invalidate search index after successful ingestion
+            from stm_mcp.matching import SearchIndex
+
+            await SearchIndex.invalidate()
+
             logger.info(f"GTFS ingestion complete: {self.db_path}")
             return row_counts
 
