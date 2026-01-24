@@ -1,5 +1,3 @@
-"""MCP tools for fuzzy resolution of stops, routes, and directions."""
-
 from stm_mcp.matching.direction_matcher import resolve_direction as _resolve_direction
 from stm_mcp.matching.models import (
     DirectionResolutionResponse,

@@ -122,3 +122,89 @@ class GetNextArrivalsResponse(BaseModel):
     )
     static_only_count: int = Field(default=0, description="Number of static-only arrivals")
     realtime_count: int = Field(default=0, description="Number of arrivals with RT data")
+
+
+# Metro Status and Service Alerts (i3 API)
+
+
+class MetroLine(str, Enum):
+    """STM metro lines by route_id."""
+
+    GREEN = "1"
+    ORANGE = "2"
+    YELLOW = "4"
+    BLUE = "5"
+
+
+class MetroStatus(str, Enum):
+    """Status of a metro line."""
+
+    NORMAL = "normal"
+    DISRUPTED = "disrupted"
+    UNKNOWN = "unknown"
+
+
+class MetroLineStatus(BaseModel):
+    """Status of a single metro line."""
+
+    line: MetroLine
+    line_name: str = Field(description="Human-readable line name (e.g., 'Green Line')")
+    status: MetroStatus
+    alerts: list["ServiceAlert"] = Field(
+        default_factory=list, description="Alerts affecting this line"
+    )
+
+
+class ServiceAlert(BaseModel):
+    """Processed service alert for display."""
+
+    # Bilingual text fields
+    header_fr: str | None = None
+    header_en: str | None = None
+    description_fr: str | None = None
+    description_en: str | None = None
+
+    # Affected entities
+    route_short_name: str | None = Field(
+        default=None, description="Route number/short name (e.g., '24', '1')"
+    )
+    direction_id: str | None = Field(
+        default=None, description="Direction identifier (e.g., 'N', 'E')"
+    )
+    stop_code: str | None = Field(default=None, description="Affected stop code")
+
+    # Time period
+    active_start: int | None = Field(
+        default=None, description="Unix timestamp when alert became active"
+    )
+    active_end: int | None = Field(
+        default=None, description="Unix timestamp when alert ends (null if ongoing)"
+    )
+
+    # Classification
+    is_metro: bool = Field(default=False, description="True if this alert is for a metro line")
+
+
+class GetMetroStatusResponse(BaseModel):
+    """Response for get_metro_status tool."""
+
+    lines: list[MetroLineStatus] = Field(description="Status of all 4 metro lines")
+    timestamp: int = Field(description="Unix timestamp of the i3 API response")
+    all_normal: bool = Field(description="True if all lines have normal service")
+    api_available: bool = Field(
+        description="Whether the i3 API was reachable (false if API key missing or error)"
+    )
+
+
+class GetServiceAlertsResponse(BaseModel):
+    """Response for get_service_alerts tool."""
+
+    alerts: list[ServiceAlert] = Field(description="Filtered service alerts")
+    count: int = Field(description="Number of alerts returned")
+    total_count: int = Field(description="Total alerts before filtering")
+    timestamp: int | None = Field(
+        default=None, description="Unix timestamp of the i3 API response"
+    )
+    api_available: bool = Field(
+        description="Whether the i3 API was reachable (false if API key missing or error)"
+    )
