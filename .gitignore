@@ -47,6 +47,7 @@ data/*.zip
 data/GTFS_stm/
 *.sqlite
 *.sqlite3
+sample_response_etatservice/
 
 # Environment
 .env
