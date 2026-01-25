@@ -259,6 +259,14 @@ class Itinerary(BaseModel):
     total_duration_minutes: int
     num_transfers: int = Field(description="Number of transfers (legs - 1)")
 
+    # Transfer details (only present for multi-leg itineraries)
+    transfer_wait_minutes: int | None = Field(
+        default=None, description="Wait time at transfer point"
+    )
+    transfer_walk_meters: float | None = Field(
+        default=None, description="Walking distance if transfer requires walking"
+    )
+
 
 class StopResolutionInfo(BaseModel):
     """How a stop query was resolved."""
