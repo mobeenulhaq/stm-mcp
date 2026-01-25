@@ -208,3 +208,85 @@ class GetServiceAlertsResponse(BaseModel):
     api_available: bool = Field(
         description="Whether the i3 API was reachable (false if API key missing or error)"
     )
+
+
+# Trip Planning Models
+
+
+class TripLeg(BaseModel):
+    """Single leg of a transit trip (one vehicle)."""
+
+    # Route identification
+    route_id: str
+    route_short_name: str | None = Field(default=None, description="From routes table")
+    route_type: int = Field(description="1=metro, 3=bus")
+    trip_id: str
+    trip_headsign: str | None = None
+
+    # Boarding stop
+    from_stop_id: str
+    from_stop_name: str
+    from_stop_code: str | None = None
+
+    # Alighting stop
+    to_stop_id: str
+    to_stop_name: str
+    to_stop_code: str | None = None
+
+    # Times (GTFS format - can exceed 24:00:00)
+    departure_time: str = Field(description="HH:MM:SS format")
+    departure_time_formatted: str
+    arrival_time: str = Field(description="HH:MM:SS format")
+    arrival_time_formatted: str
+
+    # Duration and stops
+    duration_minutes: int
+    num_stops: int = Field(description="Number of stops traveled (including endpoints)")
+
+
+class Itinerary(BaseModel):
+    """Complete journey from origin to destination."""
+
+    legs: list[TripLeg] = Field(description="Ordered list of trip legs")
+
+    # Overall times
+    departure_time: str = Field(description="First leg departure, HH:MM:SS")
+    departure_time_formatted: str
+    arrival_time: str = Field(description="Last leg arrival, HH:MM:SS")
+    arrival_time_formatted: str
+
+    # Summary
+    total_duration_minutes: int
+    num_transfers: int = Field(description="Number of transfers (legs - 1)")
+
+
+class StopResolutionInfo(BaseModel):
+    """How a stop query was resolved."""
+
+    query: str = Field(description="Original user query")
+    resolved_stop_id: str | None = None
+    resolved_stop_name: str | None = None
+    confidence: str | None = Field(default=None, description="exact, high, medium, low")
+    resolved: bool
+    error: str | None = None
+
+
+class PlanTripResponse(BaseModel):
+    """Response from plan_trip tool."""
+
+    # Resolution status
+    origin_resolution: StopResolutionInfo
+    destination_resolution: StopResolutionInfo
+
+    # Results
+    itineraries: list[Itinerary] = Field(default_factory=list)
+
+    # Time context
+    service_date: str = Field(description="GTFS service date YYYY-MM-DD")
+    departure_date: str = Field(description="Query date YYYY-MM-DD")
+    query_time: str = Field(description="Departure time HH:MM:SS")
+
+    # Status
+    count: int
+    success: bool
+    error: str | None = None

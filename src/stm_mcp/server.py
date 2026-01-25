@@ -103,6 +103,7 @@ from stm_mcp.tools import (  # noqa: F401, E402
     resolution_tools,
     schedule_tools,
     stop_tools,
+    trip_tools,
 )
 
 if __name__ == "__main__":
