@@ -1,8 +1,21 @@
-"""Text normalization utilities for fuzzy matching."""
-
 import re
 import unicodedata
 from functools import lru_cache
+
+# French article patterns to collapse (order matters - longer patterns first)
+# "de la fontaine" -> "delafontaine", "l'acadie" -> "lacadie", etc.
+FRENCH_ARTICLE_PATTERNS = [
+    (re.compile(r"\bde l'(\w)", re.IGNORECASE), r"del\1"),  # de l'X -> delX
+    (re.compile(r"\bde la[\s-]+", re.IGNORECASE), "dela"),  # de la X -> delaX
+    (re.compile(r"\bl'(\w)", re.IGNORECASE), r"l\1"),  # l'X -> lX
+    (re.compile(r"\b(la|le|du|de|des|les|aux)[\s-]+", re.IGNORECASE), r"\1"),  # la X -> laX
+]
+
+# Generic tokens to ignore in coverage calculations
+GENERIC_TOKENS = frozenset({
+    "station", "metro", "arret", "stop", "bus", "gare",
+    "nord", "sud", "est", "ouest", "north", "south", "east", "west",
+})
 
 # Montreal-specific abbreviations (lowercase -> expanded)
 ABBREVIATIONS: dict[str, str] = {
@@ -24,8 +37,10 @@ ABBREVIATIONS: dict[str, str] = {
     "mtee": "montee",
 }
 
-# Cross-street separators
-CROSS_STREET_SEPARATORS = re.compile(r"\s+(?:at|et|/|&|@|and|corner\s+of)\s+", re.IGNORECASE)
+# Cross-street separators (includes " / " and " - " as STM uses both)
+CROSS_STREET_SEPARATORS = re.compile(
+    r"\s+(?:at|et|/|-|&|@|and|corner\s+of)\s+", re.IGNORECASE
+)
 
 # Direction prefixes to strip
 DIRECTION_PREFIXES = re.compile(r"^(?:to|vers|direction)\s+", re.IGNORECASE)
@@ -49,16 +64,23 @@ def normalize_text(text: str) -> str:
 
     - Converts to lowercase
     - Removes accents
+    - Collapses French articles (la/le/du/de/des/les/aux + word)
     - Expands abbreviations
     - Normalizes whitespace
 
     Example: "St-Michel / Boul. Crémazie" -> "saint-michel / boulevard cremazie"
+    Example: "Parc La Fontaine" -> "parc lafontaine"
     """
     # Lowercase
     result = text.lower().strip()
 
     # Remove accents
     result = remove_accents(result)
+
+    # Collapse French articles with following word
+    # "la fontaine" -> "lafontaine", "de l'acadie" -> "delacadie"
+    for pattern, replacement in FRENCH_ARTICLE_PATTERNS:
+        result = pattern.sub(replacement, result)
 
     # Expand abbreviations
     for abbrev, expanded in ABBREVIATIONS.items():
@@ -96,6 +118,60 @@ def strip_direction_prefix(text: str) -> str:
     Example: "to Angrignon" -> "Angrignon"
     """
     return DIRECTION_PREFIXES.sub("", text).strip()
+
+
+def get_meaningful_tokens(text: str) -> set[str]:
+    """Extract tokens from normalized text, excluding generic/noise words.
+
+    Used for token coverage scoring to avoid inflating matches on common words.
+    Also expands article-prefixed tokens (duparc -> {duparc, parc}) to improve
+    matching when users omit articles.
+
+    Example: "station berri-uqam" -> {"berri", "uqam"}
+    Example: "du Parc-La Fontaine / Rachel" -> {"duparc", "parc", "lafontaine", "fontaine", "rachel"}
+    """
+    normalized = normalize_text(text)
+    # Split on whitespace and common separators
+    raw_tokens = re.split(r"[\s/\-]+", normalized)
+    # Filter out generic tokens and short tokens
+    tokens = {t for t in raw_tokens if t and len(t) > 1 and t not in GENERIC_TOKENS}
+
+    # Expand article-prefixed tokens: "duparc" -> also include "parc"
+    # This helps match queries like "parc" to stop names like "du Parc"
+    #
+    # Only expand unambiguous prefixes to avoid false positives on proper names.
+    # "la"/"le"/"l'" are skipped because they conflict with names like
+    # Laurier, Lionel, Lesage, Lambert, etc. Fuzzy matching handles these.
+    expanded = set()
+    for token in tokens:
+        stem = None
+
+        # Longer compound prefixes (require stem >= 3 chars)
+        for prefix in ("dela", "des", "aux"):
+            if token.startswith(prefix) and len(token) >= len(prefix) + 3:
+                stem = token[len(prefix):]
+                break
+
+        # "du"/"de" prefixes (require stem >= 3 chars)
+        if stem is None:
+            for prefix in ("du", "de"):
+                if token.startswith(prefix) and len(token) >= len(prefix) + 3:
+                    stem = token[len(prefix):]
+                    break
+
+        # "la"/"le" prefixes - very conservative (require stem >= 7 chars)
+        # This catches "lafontaine" -> "fontaine" (8 chars) but avoids
+        # "laurier" -> "urier" (5 chars), "lionel" -> "ionel" (5 chars)
+        if stem is None:
+            for prefix in ("la", "le"):
+                if token.startswith(prefix) and len(token) >= len(prefix) + 7:
+                    stem = token[len(prefix):]
+                    break
+
+        if stem and stem not in GENERIC_TOKENS:
+            expanded.add(stem)
+
+    return tokens | expanded
 
 
 def extract_route_number(query: str) -> str | None:

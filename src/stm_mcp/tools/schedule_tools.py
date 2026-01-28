@@ -1,5 +1,5 @@
 from stm_mcp.models.responses import GetScheduledArrivalsResponse
-from stm_mcp.server import mcp
+from stm_mcp.app import mcp
 from stm_mcp.services.schedule_service import (
     get_scheduled_arrivals as _get_scheduled_arrivals,
 )

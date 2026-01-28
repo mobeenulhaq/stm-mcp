@@ -1,5 +1,3 @@
-"""Pydantic models for fuzzy matching results."""
-
 from enum import Enum
 
 from pydantic import BaseModel, Field
@@ -9,8 +7,8 @@ class MatchConfidence(str, Enum):
     """Confidence level for a match.
 
     - EXACT: score=100 AND exact match type (code, ID, number, metro alias)
-    - HIGH: score >= 90 (fuzzy matches only)
-    - MEDIUM: score >= 75
+    - HIGH: score >= 85 (fuzzy matches only)
+    - MEDIUM: score >= 70
     - LOW: score >= 60
     """
 
@@ -50,9 +48,9 @@ def confidence_from_score(score: float, match_type: MatchType) -> MatchConfidenc
         return MatchConfidence.EXACT
 
     # Score-based confidence for fuzzy matches
-    if score >= 90:
+    if score >= 85:
         return MatchConfidence.HIGH
-    if score >= 75:
+    if score >= 70:
         return MatchConfidence.MEDIUM
     return MatchConfidence.LOW
 

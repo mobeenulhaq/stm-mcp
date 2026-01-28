@@ -5,14 +5,9 @@ import os
 from datetime import UTC, datetime
 from pathlib import Path
 
-from mcp.server.fastmcp import FastMCP
 from pydantic import BaseModel
 
-# Initialize the MCP server
-mcp = FastMCP(
-    "STM Transit",
-    instructions="Montreal STM transit information - schedules, real-time arrivals, and trip planning",
-)
+from stm_mcp.app import mcp
 
 
 class HealthResponse(BaseModel):

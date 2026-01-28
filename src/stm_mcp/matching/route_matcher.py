@@ -1,5 +1,3 @@
-"""Fuzzy route matching."""
-
 from pathlib import Path
 
 from rapidfuzz import fuzz

@@ -1,5 +1,5 @@
 from stm_mcp.models.responses import PlanTripResponse
-from stm_mcp.server import mcp
+from stm_mcp.app import mcp
 from stm_mcp.services.trip_planner import plan_trip as _plan_trip
 
 

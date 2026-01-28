@@ -1,5 +1,5 @@
 from stm_mcp.models.responses import GetNextArrivalsResponse
-from stm_mcp.server import mcp
+from stm_mcp.app import mcp
 from stm_mcp.services.arrivals_service import (
     get_next_arrivals as _get_next_arrivals,
 )

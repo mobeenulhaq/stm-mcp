@@ -6,7 +6,7 @@ from stm_mcp.matching.models import (
 )
 from stm_mcp.matching.route_matcher import resolve_route as _resolve_route
 from stm_mcp.matching.stop_matcher import resolve_stop as _resolve_stop
-from stm_mcp.server import mcp
+from stm_mcp.app import mcp
 
 
 @mcp.tool()

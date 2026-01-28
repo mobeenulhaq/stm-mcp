@@ -22,7 +22,17 @@ class IndexedStop:
     stop_name: str
     stop_lat: float | None
     stop_lon: float | None
+    parent_station: str | None
     normalized_name: str  # Pre-computed for fuzzy matching
+
+
+@dataclass
+class IndexedStation:
+    """Station data with pre-computed normalized text."""
+
+    stop_id: str
+    stop_name: str
+    normalized_name: str
 
 
 @dataclass
@@ -70,6 +80,8 @@ class SearchIndex:
         self.stops: list[IndexedStop] = []
         self.stops_by_code: dict[str, IndexedStop] = {}  # stop_code -> stop
         self.stops_by_id: dict[str, IndexedStop] = {}  # stop_id -> stop
+        self.stations: list[IndexedStation] = []
+        self.stations_by_id: dict[str, IndexedStation] = {}  # station stop_id -> station
 
         # Routes
         self.routes: list[IndexedRoute] = []
@@ -119,6 +131,7 @@ class SearchIndex:
         async with aiosqlite.connect(db_path) as db:
             db.row_factory = aiosqlite.Row
             await self._load_stops(db)
+            await self._load_stations(db)
             await self._load_routes(db)
             await self._load_headsigns(db)
 
@@ -130,7 +143,7 @@ class SearchIndex:
     async def _load_stops(self, db: aiosqlite.Connection) -> None:
         """Load stops into index."""
         query = """
-            SELECT stop_id, stop_code, stop_name, stop_lat, stop_lon
+            SELECT stop_id, stop_code, stop_name, stop_lat, stop_lon, parent_station
             FROM stops
             WHERE location_type IS NULL OR location_type = 0
         """
@@ -142,12 +155,30 @@ class SearchIndex:
                     stop_name=row["stop_name"],
                     stop_lat=float(row["stop_lat"]) if row["stop_lat"] else None,
                     stop_lon=float(row["stop_lon"]) if row["stop_lon"] else None,
+                    parent_station=row["parent_station"],
                     normalized_name=normalize_text(row["stop_name"]),
                 )
                 self.stops.append(stop)
                 self.stops_by_id[stop.stop_id] = stop
                 if stop.stop_code:
                     self.stops_by_code[stop.stop_code] = stop
+
+    async def _load_stations(self, db: aiosqlite.Connection) -> None:
+        """Load station-level stops into index."""
+        query = """
+            SELECT stop_id, stop_name
+            FROM stops
+            WHERE location_type = 1
+        """
+        async with db.execute(query) as cursor:
+            async for row in cursor:
+                station = IndexedStation(
+                    stop_id=row["stop_id"],
+                    stop_name=row["stop_name"],
+                    normalized_name=normalize_text(row["stop_name"]),
+                )
+                self.stations.append(station)
+                self.stations_by_id[station.stop_id] = station
 
     async def _load_routes(self, db: aiosqlite.Connection) -> None:
         """Load routes into index."""

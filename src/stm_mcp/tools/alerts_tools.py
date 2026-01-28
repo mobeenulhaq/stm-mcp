@@ -1,5 +1,5 @@
 from stm_mcp.models.responses import GetMetroStatusResponse, GetServiceAlertsResponse
-from stm_mcp.server import mcp
+from stm_mcp.app import mcp
 from stm_mcp.services.alerts_service import (
     get_metro_status as _get_metro_status,
 )

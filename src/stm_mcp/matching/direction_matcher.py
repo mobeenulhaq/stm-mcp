@@ -1,5 +1,3 @@
-"""Fuzzy direction/headsign matching."""
-
 from pathlib import Path
 
 from rapidfuzz import fuzz

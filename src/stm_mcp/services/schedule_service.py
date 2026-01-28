@@ -1,6 +1,4 @@
-"""Schedule service for querying GTFS scheduled arrivals"""
-
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 import aiosqlite
@@ -138,6 +136,141 @@ def calculate_minutes_until(arrival_time: str, query_time: str) -> int:
     return diff_seconds // 60
 
 
+# Late night service threshold: times before this hour are considered part of
+# the previous day's GTFS service (e.g., 1:30 AM is 25:30:00 on yesterday's service)
+LATE_NIGHT_THRESHOLD_HOUR = 4
+
+
+def get_gtfs_service_context(dt: datetime) -> tuple[date, str, bool]:
+    """Determine the GTFS service date and time for a given datetime.
+
+    GTFS uses extended times (25:00:00 = 1 AM, 26:00:00 = 2 AM, etc.) for
+    service that runs past midnight. A trip starting Monday evening and
+    ending at 2 AM Tuesday has times like 25:00:00-26:00:00 on Monday's
+    service date.
+
+    This function handles the "late night" period (midnight to ~4 AM) by:
+    - Using the previous calendar day as the service date
+    - Converting the time to extended GTFS format (add 24 hours)
+
+    Args:
+        dt: The datetime to convert.
+
+    Returns:
+        Tuple of (service_date, gtfs_time_str, is_late_night) where:
+        - service_date: The GTFS service date (may be previous day)
+        - gtfs_time_str: Time in HH:MM:SS format (may be 24+ hours)
+        - is_late_night: True if we're in late-night mode (midnight to 4 AM)
+
+    Examples:
+        - 10:30 PM Monday -> (Monday, "22:30:00", False)
+        - 1:30 AM Tuesday -> (Monday, "25:30:00", True)
+        - 5:00 AM Tuesday -> (Tuesday, "05:00:00", False)
+    """
+    is_late_night = dt.hour < LATE_NIGHT_THRESHOLD_HOUR
+
+    if is_late_night:
+        # Late night: use previous day's service with extended time
+        service_date = dt.date() - timedelta(days=1)
+        extended_hour = dt.hour + 24
+        gtfs_time = f"{extended_hour:02d}:{dt.minute:02d}:{dt.second:02d}"
+    else:
+        # Normal daytime: use current date with normal time
+        service_date = dt.date()
+        gtfs_time = f"{dt.hour:02d}:{dt.minute:02d}:{dt.second:02d}"
+
+    return service_date, gtfs_time, is_late_night
+
+
+def safe_parse_gtfs_time(time_str: str) -> tuple[int, int, int] | None:
+    """Safely parse a GTFS time string, returning None on failure.
+
+    Args:
+        time_str: Time string in HH:MM:SS format.
+
+    Returns:
+        Tuple of (hours, minutes, seconds) or None if parsing fails.
+    """
+    try:
+        return parse_gtfs_time(time_str)
+    except ValueError:
+        return None
+
+
+def is_time_in_late_night_range(time_str: str) -> bool:
+    """Check if a time string falls in the late-night range (00:00-03:59).
+
+    Args:
+        time_str: Time string in HH:MM:SS format.
+
+    Returns:
+        True if the time is in the 00:00-03:59 range.
+    """
+    parsed = safe_parse_gtfs_time(time_str)
+    if parsed is None:
+        return False
+    hours, _, _ = parsed
+    return hours < LATE_NIGHT_THRESHOLD_HOUR
+
+
+def is_extended_time(time_str: str) -> bool:
+    """Check if a time string is in GTFS extended format (>= 24:00:00).
+
+    Args:
+        time_str: Time string in HH:MM:SS format.
+
+    Returns:
+        True if the time is >= 24:00:00.
+    """
+    parsed = safe_parse_gtfs_time(time_str)
+    if parsed is None:
+        return False
+    hours, _, _ = parsed
+    return hours >= 24
+
+
+def convert_to_extended_time(time_str: str) -> str:
+    """Convert a time in 00:00-23:59 range to extended format by adding 24 hours.
+
+    Args:
+        time_str: Time string in HH:MM:SS format.
+
+    Returns:
+        Time with 24 hours added. Returns as-is if already extended or invalid.
+
+    Examples:
+        - "02:10:00" -> "26:10:00"
+        - "05:00:00" -> "29:00:00"
+        - "25:30:00" -> "25:30:00" (already extended)
+    """
+    parsed = safe_parse_gtfs_time(time_str)
+    if parsed is None:
+        return time_str
+
+    hours, minutes, seconds = parsed
+    if hours < 24:
+        hours += 24
+        return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+
+    return time_str
+
+
+def safe_gtfs_time_to_seconds(time_str: str) -> int | None:
+    """Safely convert a GTFS time string to seconds, returning None on failure.
+
+    Args:
+        time_str: Time string in HH:MM:SS format.
+
+    Returns:
+        Total seconds since midnight, or None if parsing fails.
+    """
+    parsed = safe_parse_gtfs_time(time_str)
+    if parsed is None:
+        return None
+    hours, minutes, seconds = parsed
+    return hours * 3600 + minutes * 60 + seconds
+
+
 async def get_active_service_ids(
     db: aiosqlite.Connection,
     query_date: date,
@@ -217,17 +350,73 @@ async def get_scheduled_arrivals(
     """
     now = datetime.now()
 
-    # Determine service date and query time
-    # For times past midnight (0:00-4:00), we might still be on "yesterday's" service day
-    # but for simplicity, we use the current date's services
-    service_date = now.date()
+    # STEP 1: Determine service_date and start_time together
 
-    # Set default times
-    if start_time is None:
-        start_time = time_to_gtfs_format(now)
+    # We track `use_extended_times` to know if we're querying previous day's
+    # service with times in 24:xx-27:xx format.
+
+    # Rules:
+    # 1. Extended start_time (25:xx) → user explicitly wants previous day's service
+    # 2. Late-night start_time (00:00-03:59) + currently late-night → previous day
+    # 3. Late-night start_time (00:00-03:59) + NOT currently late-night → today
+    # 4. Normal start_time (04:00-23:59) → today's service
+    # 5. No start_time → use "now" with late-night logic
+
+    use_extended_times = False
+
+    if start_time is not None:
+        if is_extended_time(start_time):
+            # User explicitly provided extended time (25:xx) → previous day's service
+            service_date = now.date() - timedelta(days=1)
+            use_extended_times = True
+        elif is_time_in_late_night_range(start_time):
+            # start_time is in 00:00-03:59 range
+            _, _, currently_late_night = get_gtfs_service_context(now)
+            if currently_late_night:
+                # We're at 1 AM querying for 2 AM → previous day's service
+                service_date = now.date() - timedelta(days=1)
+                start_time = convert_to_extended_time(start_time)
+                use_extended_times = True
+            else:
+                # We're at 10 AM querying for 2 AM → assume today's service
+                service_date = now.date()
+        else:
+            # start_time is 04:00-23:59 → today's service
+            service_date = now.date()
+    else:
+        # No start_time provided, use "now" with late-night logic
+        service_date, start_time, use_extended_times = get_gtfs_service_context(now)
+
+    # STEP 2: Handle end_time
+    # If we're using extended times, end_time should also be extended when needed.
+
     if end_time is None:
         # Default to 4 hours past midnight to catch late-night service
         end_time = "28:00:00"
+    elif use_extended_times and is_time_in_late_night_range(end_time):
+        # end_time is 00:00-03:59 and we're in extended mode → convert it
+        end_time = convert_to_extended_time(end_time)
+
+    # STEP 3: Sanity check - fix inverted time ranges (ONLY in extended mode)
+    # When in extended mode (querying previous day's service), if start > end
+    # and end is not already extended, extend it.
+    # Example: start=25:06:00, end=05:00:00 → end should become 29:00:00
+
+    # We ONLY do this in extended mode. In normal mode, inverted ranges like
+    # start=14:00, end=08:00 are likely user errors and should return empty
+    # results rather than silently expanding to an 18-hour window.
+
+    if use_extended_times:
+        start_seconds = safe_gtfs_time_to_seconds(start_time)
+        end_seconds = safe_gtfs_time_to_seconds(end_time)
+
+        if (
+            start_seconds is not None
+            and end_seconds is not None
+            and start_seconds > end_seconds
+            and not is_extended_time(end_time)
+        ):
+            end_time = convert_to_extended_time(end_time)
 
     async with get_db(db_path) as db:
         # Get stop info
